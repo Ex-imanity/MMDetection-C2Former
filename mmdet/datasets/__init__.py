@@ -20,6 +20,9 @@ from .xml_style import XMLDataset
 from .m3fd import M3FDDataset
 from .m3fd_vi import M3FDVIDataset
 from .m3fd_ir import M3FDIRDataset
+from .drone_vehicle import DroneVehicleDataset
+from .drone_vehicle_vi import DroneVehicleVIDataset
+from .drone_vehicle_ir import DroneVehicleIRDataset
 
 __all__ = [
     'CustomDataset', 'XMLDataset', 'CocoDataset', 'DeepFashionDataset',
@@ -31,5 +34,6 @@ __all__ = [
     'NumClassCheckHook', 'CocoPanopticDataset', 'MultiImageMixDataset',
     'OpenImagesDataset', 'OpenImagesChallengeDataset', 'Objects365V1Dataset',
     'Objects365V2Dataset', 'OccludedSeparatedCocoDataset', 
-    'M3FDDataset', 'M3FDVIDataset', 'M3FDIRDataset'
+    'M3FDDataset', 'M3FDVIDataset', 'M3FDIRDataset',
+    'DroneVehicleDataset', 'DroneVehicleVIDataset', 'DroneVehicleIRDataset'
 ]
