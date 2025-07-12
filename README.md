@@ -45,9 +45,11 @@
 
 ### Dataset
 
-[百度云](https://pan.baidu.com/s/1GoJrrl_mn2HNQVDSUdPCrw?pwd=M3FD)
+M3FD原始数据集 [百度云](https://pan.baidu.com/s/1GoJrrl_mn2HNQVDSUdPCrw?pwd=M3FD)
 
 数据集参考文献：[JinyuanLiu-CV/TarDAL: CVPR 2022 | Target-aware Dual Adversarial Learning and a Multi-scenario Multi-Modality Benchmark to Fuse Infrared and Visible for Object Detection.](https://github.com/JinyuanLiu-CV/TarDAL)
+
+VOC格式M3FD数据集 [百度云](https://pan.baidu.com/s/1g5sySMOcE8V_-sTAIOQ6JA?pwd=n3as)
 
 ## Getting Started
 
@@ -59,6 +61,6 @@ python tools/train.py configs/cascade_rcnn/cascade_rcnn_c2former_fpn_1x_m3fd.py 
 
 ### Notes
 
-数据集组织格式以及evaluation metrics为Pascal VOC格式，可见光和红外光图片放在同一文件夹/JPEGImages下，以后缀名"\*.png"和"\*tir.png"区分。由于M3FD两种模态的标注没有区分，故/Annotations文件夹中的标注以及/ImageSets/Main文件夹中的训练集验证集划分不用做模态层面的区分。
+数据集组织格式以及evaluation metrics为Pascal VOC格式，可见光和红外光图片放在同一文件夹/JPEGImages下，以后缀名"\*.png"和"\*tir.png"区分。由于M3FD两种模态的标注没有区分，故/Annotations文件夹中的标注以及/ImageSets/Main文件夹中的训练集验证集划分不用做模态层面的区分。如需复现，请直接使用VOC格式数据集。
 
 其它注意事项，例如对于多模态的输入和mmdet中detector的代码层面修改等，有空会再后续补充。建议仔细对比MMDetection原始项目和参照官方文档。
