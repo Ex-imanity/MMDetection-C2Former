@@ -29,12 +29,17 @@ def single_gpu_test(model,
             result = model(return_loss=False, rescale=True, **data)
 
         batch_size = len(result)
+
+        # 可视化：RGB 主模态（保持原逻辑）
         if show or out_dir:
+            # 提取 img 张量（兼容 DataContainer 或原生 Tensor）
             if batch_size == 1 and isinstance(data['img'][0], torch.Tensor):
                 img_tensor = data['img'][0]
             else:
                 img_tensor = data['img'][0].data[0]
+            # 元信息
             img_metas = data['img_metas'][0].data[0]
+            # 反归一化为可视化图像
             imgs = tensor2imgs(img_tensor, **img_metas[0]['img_norm_cfg'])
             assert len(imgs) == len(img_metas)
 
@@ -45,10 +50,7 @@ def single_gpu_test(model,
                 ori_h, ori_w = img_meta['ori_shape'][:-1]
                 img_show = mmcv.imresize(img_show, (ori_w, ori_h))
 
-                if out_dir:
-                    out_file = osp.join(out_dir, img_meta['ori_filename'])
-                else:
-                    out_file = None
+                out_file = osp.join(out_dir, img_meta['ori_filename']) if out_dir else None
 
                 model.module.show_result(
                     img_show,
@@ -60,11 +62,61 @@ def single_gpu_test(model,
                     out_file=out_file,
                     score_thr=show_score_thr)
 
-        # encode mask results
+            # 新增：可视化 TIR 辅模态（若测试 pipeline 中包含 img_tir）
+            if 'img_tir' in data:
+                # 提取 img_tir 张量（兼容 DataContainer 或原生 Tensor）
+                if batch_size == 1 and isinstance(data['img_tir'][0], torch.Tensor):
+                    img_tir_tensor = data['img_tir'][0]
+                else:
+                    img_tir_tensor = data['img_tir'][0].data[0]
+
+                # 取 TIR 的归一化配置：
+                # - 优先使用 img_metas[0]['img_norm_cfg_tir']
+                # - 若没有，回退为 RGB 的 img_norm_cfg（你的 Normalize 只配了一个）
+                if 'img_norm_cfg_tir' in img_metas[0]:
+                    norm_cfg_tir = img_metas[0]['img_norm_cfg_tir']
+                else:
+                    norm_cfg_tir = img_metas[0]['img_norm_cfg']
+
+                imgs_tir = tensor2imgs(img_tir_tensor, **norm_cfg_tir)
+                assert len(imgs_tir) == len(img_metas)
+
+                for i, (img_tir, img_meta) in enumerate(zip(imgs_tir, img_metas)):
+                    # 若两模态同尺寸（DroneVehicle 通常配准且同尺寸），可复用 RGB 的形状信息
+                    h, w, _ = img_meta['img_shape']
+                    img_tir_show = img_tir[:h, :w, :]
+
+                    ori_h, ori_w = img_meta['ori_shape'][:-1]
+                    img_tir_show = mmcv.imresize(img_tir_show, (ori_w, ori_h))
+
+                    # 保存文件名：
+                    # - 如果 img_metas 里带有 ori_filename_tir（Collect 收集了该键），直接用
+                    # - 否则从 ori_filename 推断（加 _tir 后缀）
+                    if out_dir:
+                        ori_fn_tir = img_meta.get('ori_filename_tir', None)
+                        if ori_fn_tir is None:
+                            base = img_meta['ori_filename']
+                            root, ext = osp.splitext(base)
+                            ori_fn_tir = f'{root}_tir{ext}'
+                        out_file_tir = osp.join(out_dir, ori_fn_tir)
+                    else:
+                        out_file_tir = None
+
+                    # 在 TIR 图上绘制同一检测结果
+                    model.module.show_result(
+                        img_tir_show,
+                        result[i],
+                        bbox_color=PALETTE,
+                        text_color=PALETTE,
+                        mask_color=PALETTE,
+                        show=show,
+                        out_file=out_file_tir,
+                        score_thr=show_score_thr)
+
+        # 保持原有 mask 编码逻辑
         if isinstance(result[0], tuple):
             result = [(bbox_results, encode_mask_results(mask_results))
                       for bbox_results, mask_results in result]
-        # This logic is only used in panoptic segmentation test.
         elif isinstance(result[0], dict) and 'ins_results' in result[0]:
             for j in range(len(result)):
                 bbox_results, mask_results = result[j]['ins_results']
