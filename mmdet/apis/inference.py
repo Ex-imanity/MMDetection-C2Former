@@ -255,3 +255,103 @@ def show_result_pyplot(model,
         text_color=(200, 200, 200),
         mask_color=palette,
         out_file=out_file)
+
+#### 支持双流输入的推理 ####
+def _replace_image_to_paired_default(pipeline):
+    """Replace any ImageToTensor in test pipeline with PairedImageDefaultFormatBundle,
+    so that both img and img_tir are wrapped into DataContainer (stack=True)."""
+    def _replace_in_list(pl):
+        for i, t in enumerate(pl):
+            if isinstance(t, dict):
+                if t.get('type') == 'MultiScaleFlipAug' and 'transforms' in t:
+                    t['transforms'] = _replace_in_list(t['transforms'])
+                elif t.get('type') == 'ImageToTensor':
+                    # Replace with PairedImageDefaultFormatBundle
+                    pl[i] = dict(type='PairedImageDefaultFormatBundle')
+        return pl
+
+    if isinstance(pipeline, list):
+        pipeline = _replace_in_list(pipeline)
+    return pipeline
+
+
+def inference_detector_paired(model, imgs_pair):
+    """Inference on paired inputs (RGB + TIR).
+
+    Args:
+        model (nn.Module): The loaded detector.
+        imgs_pair: 
+            - tuple(str|ndarray, str|ndarray): (vis, tir) single pair
+            - list[tuple(str|ndarray, str|ndarray)]: batch of pairs
+
+    Returns:
+        If input is a single pair, returns the detection result (same结构 as原版).
+        If input is a list of pairs, returns a list of detection results.
+    """
+    # Normalize input to a list of pairs
+    if isinstance(imgs_pair, (list, tuple)) and len(imgs_pair) > 0 and isinstance(imgs_pair[0], (str, np.ndarray)):
+        # single pair (vis, tir)
+        pairs = [imgs_pair]
+        is_batch = False
+    else:
+        # batch of pairs
+        pairs = imgs_pair
+        is_batch = True
+
+    cfg = model.cfg.copy()
+    device = next(model.parameters()).device
+
+    # 判断是否是内存数组输入（仅看第一对即可）
+    first_vis, first_tir = pairs[0]
+    is_ndarray_input = isinstance(first_vis, np.ndarray) and isinstance(first_tir, np.ndarray)
+
+    # 如果是 ndarray 输入，首个 loader 需要改为 LoadImageFromWebcam，以便管线后续正常工作
+    # 注意：LoadImageFromWebcam 只处理 'img'，但我们会把 'img_tir' 直接放入 results，后续 transforms 中的
+    # ImageToTensor(keys=['img', 'img_tir'])/PairedImageDefaultFormatBundle 会处理两者。
+    if is_ndarray_input:
+        if isinstance(cfg.data.test.pipeline[0], dict):
+            cfg.data.test.pipeline[0]['type'] = 'LoadImageFromWebcam'
+
+    # 将 pipeline 中的 ImageToTensor 替换为 PairedImageDefaultFormatBundle，
+    # 以保证两个模态都打包为 DataContainer（和原版 inference 的 replace_ImageToTensor 作用一致但更适配双模态）
+    cfg.data.test.pipeline = _replace_image_to_paired_default(cfg.data.test.pipeline)
+    test_pipeline = Compose(cfg.data.test.pipeline)
+
+    datas = []
+    for vis, tir in pairs:
+        if isinstance(vis, np.ndarray) and isinstance(tir, np.ndarray):
+            # 直接提供数组：跳过 LoadPairedImageFromFile，使用 LoadImageFromWebcam 加载 'img'
+            data = dict(img=vis, img_tir=tir)
+        else:
+            # 提供文件路径：由 LoadPairedImageFromFile 读取两模态
+            data = dict(img_info=dict(filename=vis, filename_tir=tir), img_prefix=None)
+
+        # build the data pipeline
+        data = test_pipeline(data)
+        datas.append(data)
+
+    data = collate(datas, samples_per_gpu=len(pairs))
+
+    # 解包 DataContainer
+    data['img_metas'] = [m.data[0] for m in data['img_metas']]
+    # img
+    data['img'] = [img.data[0] if hasattr(img, 'data') else img for img in data['img']]
+    # img_tir
+    if 'img_tir' in data:
+        data['img_tir'] = [im.data[0] if hasattr(im, 'data') else im for im in data['img_tir']]
+
+    # GPU/CUDA scatter 或 CPU 检查
+    if next(model.parameters()).is_cuda:
+        data = scatter(data, [device])[0]
+    else:
+        for m in model.modules():
+            assert not isinstance(m, RoIPool), 'CPU inference with RoIPool is not supported currently.'
+
+    # forward
+    with torch.no_grad():
+        results = model(return_loss=False, rescale=True, **data)
+
+    if not is_batch:
+        return results[0]
+    else:
+        return results
