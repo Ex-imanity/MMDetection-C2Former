@@ -85,3 +85,5 @@ python tools/infer_paired.py
 数据集组织格式以及evaluation metrics为Pascal VOC格式，可见光和红外光图片放在同一文件夹/JPEGImages下，以后缀名"\*.png"和"\*_tir.png"区分。由于M3FD两种模态的标注没有区分，故/Annotations文件夹中的标注以及/ImageSets/Main文件夹中的训练集验证集划分不用做模态层面的区分。如需复现，请直接使用VOC格式数据集。
 
 其它注意事项，例如对于多模态的输入和mmdet中detector的代码层面修改等，有空会再后续补充。建议仔细对比MMDetection原始项目和参照官方文档。
+
+issue没有及时回复的可以戳我主页邮件沟通
