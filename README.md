@@ -51,6 +51,10 @@ M3FD原始数据集 [百度云](https://pan.baidu.com/s/1GoJrrl_mn2HNQVDSUdPCrw?
 
 VOC格式M3FD数据集 [百度云](https://pan.baidu.com/s/1g5sySMOcE8V_-sTAIOQ6JA?pwd=n3as)
 
+### backbone预训练权重
+使用[C2Former](https://github.com/yuanmaoxun/C2Former)的预训练权重，将pretrain_weights文件夹放在项目路径下即可：
+https://github.com/yuanmaoxun/C2Former/tree/main/pretrain_weights
+
 ## Getting Started
 已经重写训练/测试/推理方法，均支持双模态输入输出：
 - 输入：参考提供的[VOC数据集](https://pan.baidu.com/s/1g5sySMOcE8V_-sTAIOQ6JA?pwd=n3as)图片组织方式；图像对上进行推理，参考/tools/infer_paired.py
